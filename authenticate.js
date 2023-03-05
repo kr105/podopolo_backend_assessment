@@ -39,22 +39,12 @@ opts.secretOrKey = JWT_SECRET_KEY;
 // JWT Strategy
 exports.jwtPassport = passport.use(new JwtStrategy(opts,
     // The done is the callback provided by passport
-    (jwt_payload, done) => {
-
+    async (jwt_payload, done) => {
         // Search the user with jwt.payload ID field
-        User.findOne({ _id: jwt_payload._id }, (err, user) => {
-            // Have error
-            if (err) {
-                return done(err, false);
-            }
-            // User exist
-            else if (user) {
-                return done(null, user);
-            }
-            // User doesn't exist
-            else {
-                return done(null, false);
-            }
+        await User.findOne({ _id: jwt_payload._id }).then((user) => {
+            return done(null, user);
+        }).catch((err) => {
+            console.log(err);
         });
     }));
 
