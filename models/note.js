@@ -15,9 +15,19 @@ const NoteSchema = new Schema({
     contents: {
         type: String,
         required: true
-    }
+    },
+    sharedWith: [
+        {
+            type: Schema.Types.ObjectId,
+            ref: 'User',
+            index: true
+        }
+    ]
 }, {
     timestamps: true
 });
+
+// Index to support text search
+NoteSchema.index({ title: 'text', contents: 'text' });
 
 module.exports = mongoose.model('Note', NoteSchema);

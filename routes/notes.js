@@ -1,26 +1,16 @@
 const router = require('express').Router();
 const authenticate = require('../authenticate');
 const Note = require('../models/note');
-const Sharing = require('../models/sharing');
 const User = require('../models/user');
 
 // get a list of all notes for the authenticated user
 router.get('/notes', authenticate.verifyUser, async (req, res) => {
     // Find notes that belongs to the authenticated user
-    Note.find({ owner: req.user._id }).then((notesUser) => {
-        // Find notes shared with the authenticated user
-        Sharing.find({ sharedWith: req.user._id })
-            .populate({ path: 'note' })
-            .then((notesShared) => {
-                notesShared.forEach((noteShared) => {
-                    notesUser.push(noteShared.note);
-                });
-
-                res.contentType('application/json');
-                res.status(200);
-                res.json(notesUser);
-                res.send();
-            });
+    Note.find({ $or: [{ owner: req.user._id }, { sharedWith: req.user._id }] }).then((notesUser) => {
+        res.contentType('application/json');
+        res.status(200);
+        res.json(notesUser);
+        res.send();
     });
 });
 
@@ -39,13 +29,13 @@ router.get('/notes/:id', authenticate.verifyUser, async (req, res) => {
 
         // the note doesn't belong to the authenticated user
         if (note.owner._id.equals(req.user._id) == false) {
-            Sharing.findOne({ note: note._id, sharedWith: req.user._id }).then((note) => {
+            if (req.user._id in note.sharedWith == true) {
                 // the note was shared with the user
                 res.contentType('application/json');
                 res.status(200);
                 res.json(note);
                 res.send();
-            });
+            }
 
             // the note doesn't belong to the user and it is not shared
             res.status(403);
@@ -145,23 +135,26 @@ router.post('/notes/:id/share', authenticate.verifyUser, async (req, res) => {
                 return;
             }
 
-            let sharing = new Sharing({
-                note: note,
-                sharedWith: sharedUser
-            });
+            if (sharedUser._id.equals(req.user._id) == true) {
+                res.status(400);
+                res.contentType('application/problem+json'); // RFC7807
+                res.json({ message: 'Can\'t share a note with yourself' });
+                res.send();
+                return;
+            }
 
-            // Find shared relationship
-            Sharing.findOne({ note: note, sharedWith: sharedUser }).then(async (existingSharing) => {
-                // Create it
-                if (existingSharing == null) {
-                    await sharing.save();
+            // Already shared ?
+            Note.findOne({ _id: note._id, sharedWith: sharedUser._id }).then(async (sharedNote) => {
+                if (sharedNote == null) { // Not yet shared
+                    note.sharedWith.push(sharedUser);
+                    await note.save();
                 }
 
-                // If it already exists, just return OK
+                // Return OK even if it was already shared
 
                 res.contentType('application/json');
                 res.status(200);
-                res.json({ message: 'Note shared ok' });
+                res.json({ message: 'Note shared OK' });
                 res.send();
             });
         });
