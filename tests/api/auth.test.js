@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 const request = require('supertest');
 const app = require('../../app');
-const db = require('../../db');
+const db = require('../../db'); // required to connect to the db
 
 let randomUsername = crypto.randomBytes(16).toString('hex');
 let randomPassword = crypto.randomBytes(16).toString('hex');
@@ -62,7 +62,7 @@ describe('Test Register', () => {
             .then(response => {
                 expect(response.statusCode).toBe(201);
                 expect(response.headers['content-type']).toContain('application/json');
-                expect(response.text).toContain('Registration successful');
+                expect(response.body).toHaveProperty('id');
             });
     });
 });

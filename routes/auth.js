@@ -21,7 +21,7 @@ router.post('/auth/signup', (req, res) => {
                 passport.authenticate('local')(req, res, () => {
                     res.contentType('application/json');
                     res.status(201);
-                    res.json({ message: 'Registration successful' });
+                    res.json({ id: user._id });
                 });
             }
         });
