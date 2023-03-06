@@ -158,6 +158,14 @@ router.post('/notes/:id/share', authenticate.verifyUser, async (req, res) => {
 
 // search for notes based on keywords for the authenticated user
 router.get('/search', authenticate.verifyUser, async (req, res) => {
+    if ('q' in req.query == false) {
+        res.status(400);
+        res.contentType('application/problem+json'); // RFC7807
+        res.json({ message: 'search query not specified' });
+        res.send();
+        return;
+    }
+
     // Search own notes
     Note.find({
         $or: [{ owner: req.user._id }, { sharedWith: req.user._id }], // own notes or shared notes
