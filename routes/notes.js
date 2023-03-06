@@ -1,20 +1,60 @@
 const router = require('express').Router();
 const authenticate = require('../authenticate');
 const Note = require('../models/note');
+const Sharing = require('../models/sharing');
+const User = require('../models/user');
 
 // get a list of all notes for the authenticated user
 router.get('/notes', authenticate.verifyUser, async (req, res) => {
-    Note.find({ owner: req.user._id }).then((notes) => {
-        res.contentType('application/json');
-        res.status(200);
-        res.json(notes);
-        res.send();
+    // Find notes that belongs to the authenticated user
+    Note.find({ owner: req.user._id }).then((notesUser) => {
+        // Find notes shared with the authenticated user
+        Sharing.find({ sharedWith: req.user._id })
+            .populate({ path: 'note' })
+            .then((notesShared) => {
+                notesShared.forEach((noteShared) => {
+                    notesUser.push(noteShared.note);
+                });
+
+                res.contentType('application/json');
+                res.status(200);
+                res.json(notesUser);
+                res.send();
+            });
     });
 });
 
 // get a note by ID for the authenticated user
 router.get('/notes/:id', authenticate.verifyUser, async (req, res) => {
-    Note.findOne({ _id: req.params.id, owner: req.user._id }).then((note) => {
+    // get the note
+    Note.findOne({ _id: req.params.id }).then((note) => {
+        // the note doesn't exist
+        if (note == null) {
+            res.status(404);
+            res.contentType('application/problem+json'); // RFC7807
+            res.json({ message: 'Note not found' });
+            res.send();
+            return;
+        }
+
+        // the note doesn't belong to the authenticated user
+        if (note.owner._id.equals(req.user._id) == false) {
+            Sharing.findOne({ note: note._id, sharedWith: req.user._id }).then((note) => {
+                // the note was shared with the user
+                res.contentType('application/json');
+                res.status(200);
+                res.json(note);
+                res.send();
+            });
+
+            // the note doesn't belong to the user and it is not shared
+            res.status(403);
+            res.contentType('application/problem+json'); // RFC7807
+            res.json({ message: 'Note not authorized' });
+            res.send();
+            return;
+        }
+
         res.contentType('application/json');
         res.status(200);
         res.json(note);
@@ -41,7 +81,7 @@ router.post('/notes', authenticate.verifyUser, async (req, res, next) => {
 
 // update an existing note by ID for the authenticated user
 router.put('/notes/:id', authenticate.verifyUser, async (req, res) => {
-    Note.updateOne({ _id: req.params.id, owner: req.user._id },{
+    Note.updateOne({ _id: req.params.id, owner: req.user._id }, {
         title: req.body.title,
         contents: req.body.contents
     }).then((result) => {
@@ -76,7 +116,56 @@ router.delete('/notes/:id', authenticate.verifyUser, async (req, res) => {
 
 // share a note with another user for the authenticated user
 router.post('/notes/:id/share', authenticate.verifyUser, async (req, res) => {
+    Note.findOne({ _id: req.params.id, owner: req.user._id }).then((note) => {
+        // the note doesn't exist
+        if (note == null) {
+            res.status(404);
+            res.contentType('application/problem+json'); // RFC7807
+            res.json({ message: 'Note not found' });
+            res.send();
+            return;
+        }
 
+        // required parameter
+        if ('shareWith' in req.body == false) {
+            res.status(400);
+            res.contentType('application/problem+json'); // RFC7807
+            res.json({ message: 'shareWith not provided' });
+            res.send();
+            return;
+        }
+
+        // check if provided user id is valid
+        User.findOne({ _id: req.body.shareWith }).then((sharedUser) => {
+            if (sharedUser == null) {
+                res.status(400);
+                res.contentType('application/problem+json'); // RFC7807
+                res.json({ message: 'Invalid ID on shareWith' });
+                res.send();
+                return;
+            }
+
+            let sharing = new Sharing({
+                note: note,
+                sharedWith: sharedUser
+            });
+
+            // Find shared relationship
+            Sharing.findOne({ note: note, sharedWith: sharedUser }).then(async (existingSharing) => {
+                // Create it
+                if (existingSharing == null) {
+                    await sharing.save();
+                }
+
+                // If it already exists, just return OK
+
+                res.contentType('application/json');
+                res.status(200);
+                res.json({ message: 'Note shared ok' });
+                res.send();
+            });
+        });
+    });
 });
 
 // search for notes based on keywords for the authenticated user
