@@ -162,8 +162,17 @@ router.post('/notes/:id/share', authenticate.verifyUser, async (req, res) => {
 });
 
 // search for notes based on keywords for the authenticated user
-router.get('/search?q=:query', authenticate.verifyUser, async (req, res) => {
-
+router.get('/search', authenticate.verifyUser, async (req, res) => {
+    // Search own notes
+    Note.find({
+        $or: [{ owner: req.user._id }, { sharedWith: req.user._id }], // own notes or shared notes
+        $text: { $search: req.query.q } // query string
+    }).exec().then((notesUser) => {
+        res.contentType('application/json');
+        res.status(200);
+        res.json(notesUser);
+        res.send();
+    });
 });
 
 module.exports = router;
