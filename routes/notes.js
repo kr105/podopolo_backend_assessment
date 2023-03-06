@@ -29,20 +29,15 @@ router.get('/notes/:id', authenticate.verifyUser, async (req, res) => {
 
         // the note doesn't belong to the authenticated user
         if (note.owner._id.equals(req.user._id) == false) {
-            if (req.user._id in note.sharedWith == true) {
-                // the note was shared with the user
-                res.contentType('application/json');
-                res.status(200);
-                res.json(note);
+            // if the current user is on the shared list
+            if (note.sharedWith.some(share => share._id.equals(req.user._id)) == false) {
+                // the note doesn't belong to the user and it is not shared
+                res.status(403);
+                res.contentType('application/problem+json'); // RFC7807
+                res.json({ message: 'Note not authorized' });
                 res.send();
+                return;
             }
-
-            // the note doesn't belong to the user and it is not shared
-            res.status(403);
-            res.contentType('application/problem+json'); // RFC7807
-            res.json({ message: 'Note not authorized' });
-            res.send();
-            return;
         }
 
         res.contentType('application/json');

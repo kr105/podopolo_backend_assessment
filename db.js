@@ -10,7 +10,7 @@ const mongoUrl = `mongodb${MONGO_SRV}://${MONGO_USER}:${MONGO_PASS}@${MONGO_HOST
 const connect = mongoose.connect(mongoUrl);
 
 connect.then((db) => {
-    console.log("Connected!");
+    //console.log("Connected!");
 }, (err) => { 
     console.log(err); 
 });
